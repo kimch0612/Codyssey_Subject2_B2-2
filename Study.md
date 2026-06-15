@@ -521,6 +521,54 @@ A---B---C-------M  main
 
 Squash Merge는 PR 안의 여러 커밋을 하나의 커밋으로 합쳐서 main에 넣는 방식이다.
 
+GitHub에서 사용하는 흐름:
+
+```txt
+PR 생성
+-> 리뷰 반영 커밋 추가
+-> 승인 받기
+-> Merge 버튼 옆 옵션에서 Squash and merge 선택
+-> 최종 커밋 메시지 확인
+-> main에 1개의 커밋으로 반영
+```
+
+예시 상황:
+
+```txt
+feature/kim-contributing-guide 브랜치
+
+a1b2c3d docs: add contributing outline
+b2c3d4e docs: add branch naming rule
+c3d4e5f docs: fix typo
+```
+
+Squash Merge 후 main:
+
+```txt
+f9e8d7c docs: add contributing guide
+```
+
+의미:
+
+- feature 브랜치에는 3개의 커밋이 있었지만, main에는 1개의 커밋만 남는다.
+- PR 타임라인에는 리뷰 반영 과정이 남으므로 과제 증빙은 PR 링크로 확인할 수 있다.
+
+로컬에서 squash 개념을 실습하는 명령:
+
+```bash
+git switch main
+git pull origin main
+git merge --squash feature/kim-contributing-guide
+git status
+git commit -m "docs: add contributing guide"
+```
+
+주의:
+
+- 실제 과제 저장소에서 `main` 보호 규칙이 켜져 있다면 로컬에서 main에 직접 push하면 안 된다.
+- 과제 제출용 협업은 GitHub PR의 `Squash and merge` 버튼을 사용하는 편이 안전하다.
+- 로컬 `git merge --squash`는 개념 학습이나 개인 브랜치 정리용으로 이해하면 된다.
+
 장점:
 
 - main 히스토리가 깔끔해진다.
@@ -559,7 +607,79 @@ A---B---C  main
 - 개인 브랜치의 커밋을 깔끔하게 다듬을 수 있다.
 - 보너스 과제의 `git rebase -i`에서 squash, reword를 수행할 수 있다.
 
-### 12.2 Rebase의 위험
+### 12.2 최신 main을 내 feature 브랜치에 반영하는 rebase
+
+상황:
+
+```txt
+A---B---C  origin/main
+     \
+      D---E  feature/kim-docs
+```
+
+내 feature 브랜치가 오래되어 최신 main의 `C` 커밋을 반영하고 싶다면 다음처럼 진행한다.
+
+```bash
+git switch feature/kim-docs
+git fetch origin
+git rebase origin/main
+```
+
+성공하면 히스토리는 다음처럼 바뀐다.
+
+```txt
+A---B---C  origin/main
+         \
+          D'---E'  feature/kim-docs
+```
+
+이후 확인:
+
+```bash
+git status
+git log --oneline --graph --all -10
+```
+
+아직 원격에 push하지 않은 개인 브랜치라면 일반 push를 하면 된다.
+
+```bash
+git push origin feature/kim-docs
+```
+
+이미 원격에 push한 브랜치를 rebase했다면 커밋 해시가 바뀌었기 때문에 일반 push가 거절될 수 있다. 이때는 팀과 공유한 뒤 다음 명령을 사용한다.
+
+```bash
+git push --force-with-lease origin feature/kim-docs
+```
+
+### 12.3 rebase 중 충돌이 발생했을 때
+
+rebase 중 충돌이 발생하면 Git이 중간에서 멈춘다.
+
+상태 확인:
+
+```bash
+git status
+```
+
+충돌 파일을 열어 `<<<<<<<`, `=======`, `>>>>>>>` 마커를 해결한다.
+
+해결 후:
+
+```bash
+git add docs/CONTRIBUTING.md
+git rebase --continue
+```
+
+여러 커밋을 replay하는 중이라면 충돌이 여러 번 날 수도 있다. 그때마다 파일 수정, `git add`, `git rebase --continue`를 반복한다.
+
+rebase를 취소하고 원래 상태로 돌아가고 싶을 때:
+
+```bash
+git rebase --abort
+```
+
+### 12.4 Rebase의 위험
 
 Rebase는 커밋 해시를 바꾼다. 이미 원격에 공유된 커밋을 rebase하면 다른 팀원의 히스토리와 어긋날 수 있다.
 
@@ -1039,6 +1159,12 @@ README.md
 git rebase -i HEAD~3
 ```
 
+의미:
+
+- 현재 HEAD부터 최근 3개 커밋을 정리한다.
+- 오래된 커밋이 위에, 최신 커밋이 아래에 표시된다.
+- 저장하고 에디터를 닫으면 지정한 방식대로 커밋을 다시 만든다.
+
 가능한 작업:
 
 - `pick`: 커밋 유지
@@ -1047,13 +1173,214 @@ git rebase -i HEAD~3
 - `fixup`: 이전 커밋과 합치되 메시지는 버리기
 - `drop`: 커밋 제거
 
-예시:
+### 19.1 squash로 여러 커밋을 하나로 합치기
+
+상황:
+
+```txt
+feature/kim-troubleshooting 브랜치
+
+a1b2c3d docs: add troubleshooting log
+b2c3d4e docs: add reset scenario
+c3d4e5f docs: fix typo
+```
+
+오타 수정 커밋과 보강 커밋을 하나로 합치고 싶다면 먼저 현재 로그를 확인한다.
+
+```bash
+git switch feature/kim-troubleshooting
+git log --oneline -5
+```
+
+최근 3개 커밋을 정리한다.
+
+```bash
+git rebase -i HEAD~3
+```
+
+에디터가 열리면 처음에는 다음과 비슷하게 보인다.
+
+```txt
+pick a1b2c3d docs: add troubleshooting log
+pick b2c3d4e docs: add reset scenario
+pick c3d4e5f docs: fix typo
+```
+
+첫 커밋은 유지하고 뒤의 두 커밋을 첫 커밋에 합치려면 이렇게 바꾼다.
 
 ```txt
 pick a1b2c3d docs: add initial troubleshooting log
-reword b2c3d4e docs: refine reset scenario
+sq b2c3d4e docs: add reset scenario
 squash c3d4e5f docs: fix typo
 ```
+
+`sq`는 `squash`의 줄임말이다.
+
+저장 후 에디터를 닫으면 Git이 합쳐진 커밋 메시지를 다시 편집하게 한다. 최종 메시지를 다음처럼 정리할 수 있다.
+
+```txt
+docs: add troubleshooting scenarios
+
+- Add troubleshooting log structure
+- Add reset scenario
+- Fix typo in command description
+```
+
+완료 후 확인:
+
+```bash
+git log --oneline -5
+```
+
+결과 예시:
+
+```txt
+f9e8d7c docs: add troubleshooting scenarios
+```
+
+원격에 아직 push하지 않았다면:
+
+```bash
+git push origin feature/kim-troubleshooting
+```
+
+이미 원격에 push한 커밋을 squash했다면 해시가 바뀌었으므로 팀과 공유한 뒤 다음 명령을 사용한다.
+
+```bash
+git push --force-with-lease origin feature/kim-troubleshooting
+```
+
+### 19.2 reword로 커밋 메시지 고치기
+
+상황:
+
+```txt
+a1b2c3d update
+b2c3d4e docs: add branch naming rule
+```
+
+`update`라는 메시지는 의미가 부족하므로 바꿔야 한다.
+
+최근 2개 커밋 중 하나의 메시지를 고치려면:
+
+```bash
+git rebase -i HEAD~2
+```
+
+에디터에서 다음처럼 바꾼다.
+
+```txt
+reword a1b2c3d update
+pick b2c3d4e docs: add branch naming rule
+```
+
+저장 후 다음 에디터 화면에서 메시지를 구체적으로 수정한다.
+
+```txt
+docs: add pull request template
+```
+
+확인:
+
+```bash
+git log --oneline -3
+```
+
+참고:
+
+- 가장 최근 커밋 메시지만 고칠 때는 `git commit --amend -m "새 메시지"`가 더 간단하다.
+- 여러 커밋 중 과거 커밋 메시지를 고칠 때는 `git rebase -i`가 적합하다.
+
+### 19.3 fixup으로 오타 수정 커밋 조용히 합치기
+
+`fixup`은 squash와 비슷하지만 합쳐지는 커밋의 메시지를 버린다.
+
+상황:
+
+```txt
+a1b2c3d docs: add conflict resolution log
+b2c3d4e docs: fix typo
+```
+
+명령:
+
+```bash
+git rebase -i HEAD~2
+```
+
+에디터에서:
+
+```txt
+pick a1b2c3d docs: add conflict resolution log
+fixup b2c3d4e docs: fix typo
+```
+
+결과:
+
+```txt
+f9e8d7c docs: add conflict resolution log
+```
+
+오타 수정 커밋 메시지는 버려지고 첫 커밋 메시지만 남는다.
+
+### 19.4 정리 전/후 히스토리 증빙 남기기
+
+보너스 과제에서는 rebase 전후를 비교해 문서화하면 좋다.
+
+정리 전 확인:
+
+```bash
+git log --oneline --graph -5
+```
+
+예시:
+
+```txt
+* c3d4e5f docs: fix typo
+* b2c3d4e docs: add reset scenario
+* a1b2c3d docs: add troubleshooting log
+```
+
+정리 후 확인:
+
+```bash
+git log --oneline --graph -5
+```
+
+예시:
+
+```txt
+* f9e8d7c docs: add troubleshooting scenarios
+```
+
+문서에는 다음처럼 남기면 된다.
+
+````md
+## Rebase 정리 기록
+
+### 대상 브랜치
+- feature/kim-troubleshooting
+
+### 정리 전
+- docs: add troubleshooting log
+- docs: add reset scenario
+- docs: fix typo
+
+### 수행 명령
+```bash
+git rebase -i HEAD~3
+```
+
+### 정리 내용
+- reset 시나리오 추가 커밋과 오타 수정 커밋을 첫 문서 작성 커밋에 squash했다.
+- 최종 커밋 메시지를 `docs: add troubleshooting scenarios`로 정리했다.
+
+### 정리 후
+- docs: add troubleshooting scenarios
+
+### 주의점
+- rebase로 커밋 해시가 바뀌었기 때문에 원격 브랜치 갱신 시 `--force-with-lease`를 사용했다.
+````
 
 결과:
 
@@ -1128,9 +1455,631 @@ SUBMISSION.md @member1 @member2 @member3
 19. 보너스 수행 시 rebase 기록과 CODEOWNERS 추가
 20. 제출 전 체크리스트로 최종 점검
 
-## 22. 자주 하는 실수
+## 22. 명령어 실전 치트시트
 
-### 22.1 main에 직접 push
+이 섹션은 과제를 실제로 수행할 때 자주 치게 되는 명령어를 흐름별로 정리한 것이다.
+
+명령어는 반드시 현재 브랜치와 변경 상태를 확인한 뒤 실행해야 한다.
+
+가장 자주 확인할 명령:
+
+```bash
+git status
+git branch
+git log --oneline --graph --decorate --all -10
+```
+
+### 22.1 최초 설정
+
+Git 사용자 정보 확인:
+
+```bash
+git config user.name
+git config user.email
+```
+
+전역 사용자 정보 설정:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your-email@example.com"
+```
+
+현재 저장소에서만 사용자 정보를 다르게 설정:
+
+```bash
+git config user.name "Team Member Name"
+git config user.email "team-member@example.com"
+```
+
+설정 전체 확인:
+
+```bash
+git config --list
+```
+
+### 22.2 저장소 시작 또는 가져오기
+
+새 로컬 저장소 시작:
+
+```bash
+git init
+git branch -M main
+```
+
+원격 저장소 연결:
+
+```bash
+git remote add origin git@github.com:ORG_OR_USER/REPO.git
+git remote -v
+```
+
+처음 push:
+
+```bash
+git push -u origin main
+```
+
+이미 만들어진 저장소 clone:
+
+```bash
+git clone git@github.com:ORG_OR_USER/REPO.git
+cd REPO
+```
+
+원격 브랜치까지 확인:
+
+```bash
+git branch -a
+```
+
+### 22.3 하루 작업 시작 루틴
+
+작업 시작 전에는 main을 최신 상태로 맞춘다.
+
+```bash
+git switch main
+git pull --ff-only origin main
+```
+
+`--ff-only`는 fast-forward가 가능할 때만 pull을 허용한다. 예상치 못한 merge commit이 생기는 것을 막는 데 도움이 된다.
+
+새 feature 브랜치 생성:
+
+```bash
+git switch -c feature/kim-contributing-guide
+```
+
+이미 있는 feature 브랜치로 이동:
+
+```bash
+git switch feature/kim-contributing-guide
+```
+
+브랜치 목록 확인:
+
+```bash
+git branch
+```
+
+브랜치별 원격 추적 상태 확인:
+
+```bash
+git branch -vv
+```
+
+### 22.4 변경 확인, 스테이징, 커밋
+
+현재 상태 확인:
+
+```bash
+git status
+```
+
+짧은 상태 확인:
+
+```bash
+git status -sb
+```
+
+아직 staged 되지 않은 변경 확인:
+
+```bash
+git diff
+```
+
+특정 파일 변경만 확인:
+
+```bash
+git diff docs/CONTRIBUTING.md
+```
+
+파일을 Staging Area에 올리기:
+
+```bash
+git add docs/CONTRIBUTING.md
+```
+
+여러 파일 올리기:
+
+```bash
+git add README.md SUBMISSION.md docs/CONTRIBUTING.md
+```
+
+현재 디렉터리 아래 변경을 모두 올리기:
+
+```bash
+git add .
+```
+
+staged 된 변경 확인:
+
+```bash
+git diff --staged
+```
+
+커밋:
+
+```bash
+git commit -m "docs: add contributing guide"
+```
+
+변경 내용을 보면서 커밋 메시지 작성:
+
+```bash
+git commit -v
+```
+
+최근 커밋 확인:
+
+```bash
+git log --oneline -5
+```
+
+### 22.5 원격 브랜치 push
+
+feature 브랜치를 처음 원격에 올릴 때:
+
+```bash
+git push -u origin feature/kim-contributing-guide
+```
+
+이후 같은 브랜치에서 추가 push:
+
+```bash
+git push
+```
+
+원격 브랜치 이름을 명시해서 push:
+
+```bash
+git push origin feature/kim-contributing-guide
+```
+
+원격 브랜치 삭제:
+
+```bash
+git push origin --delete feature/kim-contributing-guide
+```
+
+로컬 브랜치 삭제:
+
+```bash
+git branch -d feature/kim-contributing-guide
+```
+
+강제로 로컬 브랜치를 삭제해야 하는 경우:
+
+```bash
+git branch -D feature/kim-contributing-guide
+```
+
+주의:
+
+- `-D`는 merge되지 않은 로컬 변경 이력도 삭제할 수 있으므로 신중하게 사용한다.
+- 과제에서는 PR 병합 후 GitHub가 제공하는 delete branch 기능을 사용해도 된다.
+
+### 22.6 Issue와 PR을 GitHub CLI로 다루기
+
+GitHub CLI인 `gh`가 설치되어 있고 로그인이 되어 있다면 명령어로 Issue와 PR을 만들 수 있다.
+
+로그인 상태 확인:
+
+```bash
+gh auth status
+```
+
+Issue 생성:
+
+```bash
+gh issue create \
+  --title "docs: contributing guide 작성" \
+  --body "브랜치 네이밍, 커밋 메시지, PR 규칙을 정리합니다."
+```
+
+Issue 목록 확인:
+
+```bash
+gh issue list
+```
+
+PR 생성:
+
+```bash
+gh pr create \
+  --base main \
+  --head feature/kim-contributing-guide \
+  --title "docs: add contributing guide" \
+  --body "Closes #3
+
+## 변경 사항(What)
+- CONTRIBUTING.md에 협업 규칙을 추가했습니다.
+
+## 변경 이유(Why)
+- 팀원이 같은 기준으로 작업하기 위해 필요합니다.
+
+## 테스트/검증(How)
+- 마크다운 렌더링과 필수 항목 포함 여부를 확인했습니다."
+```
+
+PR 목록 확인:
+
+```bash
+gh pr list
+```
+
+PR 상세 확인:
+
+```bash
+gh pr view 7
+```
+
+브라우저에서 PR 열기:
+
+```bash
+gh pr view 7 --web
+```
+
+다른 사람 PR을 로컬로 가져와 확인:
+
+```bash
+gh pr checkout 7
+```
+
+리뷰 코멘트 작성:
+
+```bash
+gh pr review 7 --comment --body "docs/CONTRIBUTING.md의 브랜치 예시와 README의 예시가 다릅니다. 하나로 통일하면 좋겠습니다."
+```
+
+승인 리뷰 작성:
+
+```bash
+gh pr review 7 --approve --body "필수 항목을 모두 충족했고 예시도 일관됩니다."
+```
+
+수정 요청 리뷰 작성:
+
+```bash
+gh pr review 7 --request-changes --body "PR 본문에 검증 방법이 빠져 있어 보강이 필요합니다."
+```
+
+주의:
+
+- `gh`를 쓰지 않아도 GitHub 웹 UI로 같은 작업을 할 수 있다.
+- 과제에서는 명령 사용 여부보다 Issue, PR, Review 기록이 남는 것이 중요하다.
+
+### 22.7 main 최신 내용을 feature 브랜치에 반영
+
+방법 A: merge 사용
+
+```bash
+git switch feature/kim-contributing-guide
+git fetch origin
+git merge origin/main
+```
+
+장점:
+
+- 기존 커밋 해시가 바뀌지 않는다.
+- 공유된 브랜치에서도 비교적 안전하다.
+
+단점:
+
+- merge commit이 생길 수 있다.
+
+방법 B: rebase 사용
+
+```bash
+git switch feature/kim-contributing-guide
+git fetch origin
+git rebase origin/main
+```
+
+장점:
+
+- 히스토리가 직선에 가깝게 정리된다.
+
+단점:
+
+- 커밋 해시가 바뀐다.
+- 이미 push한 브랜치라면 `--force-with-lease`가 필요할 수 있다.
+
+### 22.8 충돌 해결 명령
+
+충돌 발생 상태 확인:
+
+```bash
+git status
+```
+
+충돌 파일 예시:
+
+```txt
+both modified: docs/conflict-resolution.md
+```
+
+파일을 수정해 충돌 마커를 제거한 뒤:
+
+```bash
+git add docs/conflict-resolution.md
+```
+
+merge 중이었다면:
+
+```bash
+git commit
+```
+
+rebase 중이었다면:
+
+```bash
+git rebase --continue
+```
+
+merge를 취소하고 충돌 전으로 돌아가기:
+
+```bash
+git merge --abort
+```
+
+rebase를 취소하고 충돌 전으로 돌아가기:
+
+```bash
+git rebase --abort
+```
+
+충돌 해결 후 히스토리 확인:
+
+```bash
+git log --oneline --graph --decorate --all -10
+```
+
+### 22.9 파일 이동, 삭제, 이름 변경
+
+Git이 파일 이동을 더 잘 추적하도록 `git mv`를 사용할 수 있다.
+
+파일 이름 변경:
+
+```bash
+git mv docs/old-guide.md docs/contributing-guide.md
+git commit -m "docs: rename contributing guide"
+```
+
+파일 삭제:
+
+```bash
+git rm docs/unused.md
+git commit -m "docs: remove unused guide"
+```
+
+주의:
+
+- 한쪽은 파일 이동, 다른 한쪽은 내용 수정을 하면 충돌 또는 병합 이슈가 생길 수 있다.
+- 과제의 비자명 충돌 실습에 사용할 수 있는 시나리오다.
+
+### 22.10 작업 되돌리기
+
+Working Tree의 특정 파일 변경 취소:
+
+```bash
+git restore README.md
+```
+
+Staging Area에서 파일 내리기:
+
+```bash
+git restore --staged README.md
+```
+
+최근 커밋 메시지 수정:
+
+```bash
+git commit --amend -m "docs: add submission index"
+```
+
+최근 커밋 취소, 변경은 staged 상태로 유지:
+
+```bash
+git reset --soft HEAD~1
+```
+
+최근 커밋 취소, 변경은 unstaged 상태로 유지:
+
+```bash
+git reset --mixed HEAD~1
+```
+
+원격에 push된 커밋을 안전하게 되돌리기:
+
+```bash
+git revert <commit-hash>
+```
+
+특정 커밋이 바꾼 내용 확인:
+
+```bash
+git show <commit-hash>
+```
+
+주의:
+
+- 협업 중 원격에 push된 커밋은 reset보다 revert로 되돌리는 것이 안전하다.
+- `git reset --hard`는 변경 내용을 잃을 수 있으므로 과제 중에는 특별한 이유 없이 사용하지 않는 편이 좋다.
+
+### 22.11 stash로 작업 잠시 보관
+
+현재 작업 보관:
+
+```bash
+git stash push -m "docs: contributing 작성 중"
+```
+
+stash 목록 확인:
+
+```bash
+git stash list
+```
+
+stash 내용 요약 확인:
+
+```bash
+git stash show stash@{0}
+```
+
+stash 내용 자세히 확인:
+
+```bash
+git stash show -p stash@{0}
+```
+
+가장 최근 stash 적용 후 목록에서 제거:
+
+```bash
+git stash pop
+```
+
+stash 적용만 하고 목록에는 유지:
+
+```bash
+git stash apply stash@{0}
+```
+
+특정 stash 삭제:
+
+```bash
+git stash drop stash@{0}
+```
+
+stash 실습 흐름 예시:
+
+```bash
+git status
+git stash push -m "docs: conflict log 작성 중"
+git switch main
+git pull --ff-only origin main
+git switch feature/kim-conflict-log
+git stash pop
+```
+
+### 22.12 히스토리와 증빙 확인
+
+전체 브랜치 그래프:
+
+```bash
+git log --oneline --graph --all
+```
+
+최근 20개만 보기:
+
+```bash
+git log --oneline --graph --decorate --all -20
+```
+
+파일별 변경 통계:
+
+```bash
+git log --stat --oneline
+```
+
+특정 파일 히스토리:
+
+```bash
+git log --oneline -- docs/CONTRIBUTING.md
+```
+
+특정 커밋의 변경 파일 목록:
+
+```bash
+git show --name-only <commit-hash>
+```
+
+특정 커밋의 변경 요약:
+
+```bash
+git show --stat <commit-hash>
+```
+
+두 브랜치 차이 확인:
+
+```bash
+git diff main...feature/kim-contributing-guide
+```
+
+과제 제출 증빙으로 남기기 좋은 명령:
+
+```bash
+git log --oneline --graph --decorate --all -30
+git branch -a
+git remote -v
+```
+
+### 22.13 과제용 추천 명령 흐름
+
+개인 작업 1개를 Issue에서 PR까지 진행하는 예시다.
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c feature/kim-contributing-guide
+```
+
+파일 수정 후:
+
+```bash
+git status
+git diff
+git add docs/CONTRIBUTING.md
+git diff --staged
+git commit -m "docs: add contributing guide"
+```
+
+원격에 올리기:
+
+```bash
+git push -u origin feature/kim-contributing-guide
+```
+
+PR 생성 후 리뷰 반영:
+
+```bash
+git status
+git add docs/CONTRIBUTING.md
+git commit -m "docs: clarify branch naming rule"
+git push
+```
+
+PR merge 후 로컬 정리:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git branch -d feature/kim-contributing-guide
+```
+
+## 23. 자주 하는 실수
+
+### 23.1 main에 직접 push
 
 문제:
 
@@ -1143,7 +2092,7 @@ SUBMISSION.md @member1 @member2 @member3
 - Branch Protection을 먼저 설정한다.
 - 모든 작업은 feature 브랜치에서 시작한다.
 
-### 22.2 Issue 없이 PR 생성
+### 23.2 Issue 없이 PR 생성
 
 문제:
 
@@ -1155,7 +2104,7 @@ SUBMISSION.md @member1 @member2 @member3
 - 작업 전에 Issue를 먼저 만든다.
 - PR 본문 첫 부분에 연결 Issue를 적는다.
 
-### 22.3 형식적인 리뷰만 남김
+### 23.3 형식적인 리뷰만 남김
 
 문제:
 
@@ -1166,7 +2115,7 @@ SUBMISSION.md @member1 @member2 @member3
 - 파일, 줄, 문단, 로직 중 하나를 근거로 코멘트를 남긴다.
 - 질문, 대안 제안, 리스크 지적 중 하나 이상을 포함한다.
 
-### 22.4 충돌을 문서화하지 않음
+### 23.4 충돌을 문서화하지 않음
 
 문제:
 
@@ -1178,7 +2127,7 @@ SUBMISSION.md @member1 @member2 @member3
 - 관련 PR과 커밋 링크를 남긴다.
 - 해결 기준과 명령을 문서에 적는다.
 
-### 22.5 reset과 revert를 혼동
+### 23.5 reset과 revert를 혼동
 
 문제:
 
@@ -1189,7 +2138,7 @@ SUBMISSION.md @member1 @member2 @member3
 - 로컬에서 아직 공유하지 않은 커밋 정리는 reset을 사용한다.
 - 원격에 push된 커밋 취소는 revert를 사용한다.
 
-## 23. 제출 전 확인 질문
+## 24. 제출 전 확인 질문
 
 제출 전 다음 질문에 답할 수 있어야 한다.
 
@@ -1206,7 +2155,7 @@ SUBMISSION.md @member1 @member2 @member3
 - rebase는 왜 히스토리를 깔끔하게 만들지만 위험할 수 있는가?
 - CODEOWNERS는 어떤 문제를 줄여주는가?
 
-## 24. 핵심 요약
+## 25. 핵심 요약
 
 이 과제에서 가장 중요한 것은 "기록"이다.
 
